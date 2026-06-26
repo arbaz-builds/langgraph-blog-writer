@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from langchain_openai import ChatOpenAI
 from typing import Literal, Optional, List, Annotated
 from typing import TypedDict
