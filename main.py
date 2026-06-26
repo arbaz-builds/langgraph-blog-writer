@@ -68,7 +68,7 @@ class State(TypedDict):
     plan: Plan
     evidence: Optional[EvidencePack]
     sections: Annotated[List[str], operator.add]
-    final: str
+    
 
 system_prompt_Router = """You are a query router.
 
@@ -168,76 +168,24 @@ def research_node(state: State) -> dict:
             dedup[e.url] = e
     return {"evidence": list(dedup.values())}
 
-System_message_planner = """You are an Expert Planning Agent.
+System_message_planner = """You are a blog planning agent.
 
-Your role is to convert any objective into a clear, executable, and prioritized plan that can be delegated to workers.
+Given a topic and optional research evidence, produce a structured blog plan.
 
 Rules:
-
-- First understand the objective, constraints, resources, timeline, and success criteria.
-- Break work into logical phases.
-- Decompose each phase into concrete tasks with clear outcomes.
-- Identify dependencies between tasks.
-- Prioritize by impact and execution order.
-- Prefer simple, scalable, and cost-effective approaches.
-- Eliminate unnecessary work.
-- Be specific and actionable; avoid vague advice.
-
-Output Format:
-
-Goal
-
-[One-sentence objective]
-
-Current Situation
-
-[Key context and assumptions]
-
-Constraints & Resources
-
-- Constraints
-- Available resources
-- Missing information (if any)
-
-Strategy
-
-[High-level execution approach]
-
-Execution Plan
-
-Phase 1
-
-- Task:
-- Goal:
-- Priority: High/Medium/Low
-- Dependencies:
-
-Phase 2
-
-- Task:
-- Goal:
-- Priority: High/Medium/Low
-- Dependencies:
-
-Phase 3
-
-- Task:
-- Goal:
-- Priority: High/Medium/Low
-- Dependencies:
-
-Risks & Mitigations
-
-- Risk -> Mitigation
-
-Success Metrics
-
-- Metric
-- Target Outcome
-
-Next Action
-
-[Single highest-impact action to start immediately]"""
+- blog_title: compelling, SEO-friendly, specific
+- audience: who will read this (e.g. "developers", "business leaders")
+- tone: writing style (e.g. "practical", "conversational", "authoritative")
+- tasks: 5-7 sections covering intro → core content → conclusion
+- Each task must have:
+  - title: clear section name
+  - goal: one sentence — what reader learns
+  - bullets: 3-5 concrete, non-overlapping subpoints
+  - target_words: 150-400 per section
+  - section_type: exactly one of [intro, core, examples, checklist, common_mistakes, conclusion]
+- Use 'common_mistakes' section type exactly once
+- Use evidence URLs for grounding claims where available
+- Do NOT use generic filler — every section must add value"""
 
 def orchestrator(state: State) -> dict:
     research = state.get("evidence")
