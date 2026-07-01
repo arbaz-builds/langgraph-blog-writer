@@ -195,13 +195,19 @@ Rules:
 
 def orchestrator(state: State) -> dict:
     research = state.get("evidence")
-    planner = general_LLM.with_structured_output(Plan)
-    plan = planner.invoke([
+    messages = [
         SystemMessage(content=System_message_planner),
         HumanMessage(content=f"Topic: {state['topic']}:\n"
                              f"Evidence (ONLY use for fresh claims; may be empty):\n"
                              f"DATA{research}")
-    ])
+    ]
+    try:
+        planner = general_LLM.with_structured_output(Plan)
+        plan = planner.invoke(messages)
+    except Exception as e:
+        print(f"[Orchestrator] general_LLM failed, falling back: {e}")
+        planner = fallback_LLM.with_structured_output(Plan)
+        plan = planner.invoke(messages)
     return {"plan": plan}
 
 def fanout(state: State):
@@ -237,7 +243,7 @@ def worker_node(payload: dict) -> dict:
     plan = payload["plan"]
     evidence = payload["evidence"]
     bullets_text = "\n- " + "\n- ".join(task.bullets)
-    section_md = general_LLM.invoke([
+    messages = [
         SystemMessage(content=WORKER_SYSTEM),
         HumanMessage(content=(
             f"Blog: {plan.blog_title}\n"
@@ -250,7 +256,12 @@ def worker_node(payload: dict) -> dict:
             f"Bullets: {bullets_text}\n"
             f"Evidence: {evidence}\n"
         ))
-    ]).content.strip()
+    ]
+    try:
+        section_md = general_LLM.invoke(messages).content.strip()
+    except Exception as e:
+        print(f"[Worker] general_LLM failed, falling back: {e}")
+        section_md = fallback_LLM.invoke(messages).content.strip()
     return {"sections": [section_md]}
 
 blog_graph = StateGraph(State)
