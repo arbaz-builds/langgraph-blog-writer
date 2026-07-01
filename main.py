@@ -33,6 +33,12 @@ general_LLM = ChatOpenAI(
     model="openai/gpt-oss-120b"
 )
 
+fallback_LLM = ChatOpenAI(
+    base_url=BASE_URL,
+    api_key=API_KEY,
+    model="mistralai/mistral-nemotron"
+)
+
 class RouterStructured(BaseModel):
     reasoning: str
     route: Literal["research", "planning"]
