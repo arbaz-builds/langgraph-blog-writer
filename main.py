@@ -27,7 +27,7 @@ router_llm = ChatOpenAI(
     temperature=0
 )
 
-planning_LLM = ChatOpenAI(
+general_LLM = ChatOpenAI(
     base_url=BASE_URL,
     api_key=API_KEY,
     model="openai/gpt-oss-120b"
@@ -157,7 +157,7 @@ def research_node(state: State) -> dict:
         raw_results.extend(_tavily_search(q, max_results=max_results))
     if not raw_results:
         return {"evidence": []}
-    extractor = planning_LLM.with_structured_output(EvidencePack)
+    extractor = general_LLM.with_structured_output(EvidencePack)
     pack = extractor.invoke([
         SystemMessage(content=RESEARCH_SYSTEM),
         HumanMessage(content=f"Raw results:\n{raw_results}"),
@@ -189,7 +189,7 @@ Rules:
 
 def orchestrator(state: State) -> dict:
     research = state.get("evidence")
-    planner = planning_LLM.with_structured_output(Plan)
+    planner = general_LLM.with_structured_output(Plan)
     plan = planner.invoke([
         SystemMessage(content=System_message_planner),
         HumanMessage(content=f"Topic: {state['topic']}:\n"
@@ -231,7 +231,7 @@ def worker_node(payload: dict) -> dict:
     plan = payload["plan"]
     evidence = payload["evidence"]
     bullets_text = "\n- " + "\n- ".join(task.bullets)
-    section_md = planning_LLM.invoke([
+    section_md = general_LLM.invoke([
         SystemMessage(content=WORKER_SYSTEM),
         HumanMessage(content=(
             f"Blog: {plan.blog_title}\n"
