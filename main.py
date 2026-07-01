@@ -205,9 +205,35 @@ def orchestrator(state: State) -> dict:
         planner = general_LLM.with_structured_output(Plan)
         plan = planner.invoke(messages)
     except Exception as e:
-        print(f"[Orchestrator] general_LLM failed, falling back: {e}")
-        planner = fallback_LLM.with_structured_output(Plan)
-        plan = planner.invoke(messages)
+        print(f"[Orchestrator] general_LLM failed: {e}")
+        try:
+            planner = fallback_LLM.with_structured_output(Plan)
+            plan = planner.invoke(messages)
+        except Exception as e2:
+            print(f"[Orchestrator] fallback_LLM also failed, using rule-based plan: {e2}")
+            plan = Plan(
+                blog_title=state["topic"],
+                audience="general readers",
+                tone="informative",
+                tasks=[
+                    Task(id=1, title="Introduction",
+                         goal=f"Introduce the topic: {state['topic']}",
+                         bullets=["What this topic covers", "Why it matters", "What the reader will learn"],
+                         target_words=200, section_type="intro"),
+                    Task(id=2, title="Core Concepts",
+                         goal="Explain the main ideas behind the topic",
+                         bullets=["Key concept 1", "Key concept 2", "Key concept 3"],
+                         target_words=350, section_type="core"),
+                    Task(id=3, title="Common Mistakes",
+                         goal="Highlight pitfalls readers should avoid",
+                         bullets=["Common mistake 1", "Common mistake 2", "Common mistake 3"],
+                         target_words=250, section_type="common_mistakes"),
+                    Task(id=4, title="Conclusion",
+                         goal="Summarize the key takeaways",
+                         bullets=["Recap main points", "Final thoughts"],
+                         target_words=150, section_type="conclusion"),
+                ]
+            )
     return {"plan": plan}
 
 def fanout(state: State):
