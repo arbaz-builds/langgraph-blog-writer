@@ -130,9 +130,9 @@ def router_condition(state: State):
         return "research"
     return "plan"
 
-def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
+async def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
     tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
-    results = tool.invoke({"query": query})
+    results = await tool.ainvoke({"query": query})
     normalized: List[dict] = []
     for r in results or []:
         normalized.append({
@@ -162,7 +162,8 @@ async def research_node(state: State) -> dict:
     max_results = 6
     raw_results: List[dict] = []
     for q in queries:
-        raw_results.extend(_tavily_search(q, max_results=max_results))
+        results = await _tavily_search(q, max_results=max_results)
+        raw_results.extend(results)
     if not raw_results:
         return {"evidence": []}
     extractor = general_LLM.with_structured_output(EvidencePack)
