@@ -104,7 +104,7 @@ Rules:
 - Avoid duplicates, questions, and conversational phrasing.
 - Reasoning must briefly justify the route."""
 
-def router_node(state: State):
+async def router_node(state: State):
     try:
         user_prompt = str(state.get("topic", ""))
         structured_llm = router_llm.with_structured_output(RouterStructured, method="json_mode")
@@ -112,7 +112,7 @@ def router_node(state: State):
             SystemMessage(content=system_prompt_Router),
             HumanMessage(content=user_prompt)
         ]
-        router_output = structured_llm.invoke(router_messages)
+        router_output = await structured_llm.ainvoke(router_messages)
         return {"router_decision": router_output}
     except Exception as e:
         print(f"[Router] Error encountered: {e}")
@@ -157,7 +157,7 @@ Rules:
 - Deduplicate by URL.
 """
 
-def research_node(state: State) -> dict:
+async def research_node(state: State) -> dict:
     queries = state["router_decision"].query or []
     max_results = 6
     raw_results: List[dict] = []
@@ -166,7 +166,7 @@ def research_node(state: State) -> dict:
     if not raw_results:
         return {"evidence": []}
     extractor = general_LLM.with_structured_output(EvidencePack)
-    pack = extractor.invoke([
+    pack = await extractor.ainvoke([
         SystemMessage(content=RESEARCH_SYSTEM),
         HumanMessage(content=f"Raw results:\n{raw_results}"),
     ])
@@ -195,7 +195,7 @@ Rules:
 - Use evidence URLs for grounding claims where available
 - Do NOT use generic filler — every section must add value"""
 
-def orchestrator(state: State) -> dict:
+async def orchestrator(state: State) -> dict:
     research = state.get("evidence")
     messages = [
         SystemMessage(content=System_message_planner),
@@ -205,12 +205,12 @@ def orchestrator(state: State) -> dict:
     ]
     try:
         planner = general_LLM.with_structured_output(Plan)
-        plan = planner.invoke(messages)
+        plan = await planner.ainvoke(messages)
     except Exception as e:
         print(f"[Orchestrator] general_LLM failed: {e}")
         try:
             planner = fallback_LLM.with_structured_output(Plan)
-            plan = planner.invoke(messages)
+            plan = await planner.ainvoke(messages)
         except Exception as e2:
             print(f"[Orchestrator] fallback_LLM also failed, using rule-based plan: {e2}")
             plan = Plan(
@@ -265,7 +265,7 @@ Requirements:
 - Do not write content outside this section.
 - Output only the section Markdown."""
 
-def worker_node(payload: dict) -> dict:
+async def worker_node(payload: dict) -> dict:
     task = payload["task"]
     topic = payload["topic"]
     plan = payload["plan"]
@@ -286,10 +286,12 @@ def worker_node(payload: dict) -> dict:
         ))
     ]
     try:
-        section_md = general_LLM.invoke(messages).content.strip()
+        response = await general_LLM.ainvoke(messages)
+        section_md = response.content.strip()
     except Exception as e:
         print(f"[Worker] general_LLM failed, falling back: {e}")
-        section_md = fallback_LLM.invoke(messages).content.strip()
+        response = await fallback_LLM.ainvoke(messages)
+        section_md = response.content.strip()
     return {"sections": [section_md]}
 
 blog_graph = StateGraph(State)
@@ -319,10 +321,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 @fastapi_app.post("/Agent")
-def BlogAgent(request: QueryRequest):
+async def BlogAgent(request: QueryRequest):
     try:
         inputs = {"topic": request.query_text}
-        result = compiled_blog_agent.invoke(inputs)
+        result = await compiled_blog_agent.ainvoke(inputs)
         return {
             "blog_title": result["plan"].blog_title,
             "sections": result["sections"]
