@@ -10,7 +10,9 @@ from langchain.tools import tool
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 from langchain_community.tools.tavily_search import TavilySearchResults
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import operator
 import requests
@@ -309,11 +311,22 @@ fastapi_app = FastAPI()
 class QueryRequest(BaseModel):
     query_text: str
 
+@fastapi_app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"error": "Bad Request", "detail": exc.errors()}
+    )
+
 @fastapi_app.post("/Agent")
 def BlogAgent(request: QueryRequest):
-    inputs = {"topic": request.query_text}
-    result = compiled_blog_agent.invoke(inputs)
-    return {
-        "blog_title": result["plan"].blog_title,
-        "sections": result["sections"]
-    }
+    try:
+        inputs = {"topic": request.query_text}
+        result = compiled_blog_agent.invoke(inputs)
+        return {
+            "blog_title": result["plan"].blog_title,
+            "sections": result["sections"]
+        }
+    except Exception as e:
+        print(f"[BlogAgent] Server-side error: {e}")
+        raise HTTPException(status_code=500, detail="Internal error occurred, please try again later")
