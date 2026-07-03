@@ -328,7 +328,12 @@ compiled_blog_agent = blog_graph.compile()
 fastapi_app = FastAPI()
 
 class QueryRequest(BaseModel):
-    query_text: str
+    query_text: str = Field(
+        ...,
+        min_length=15,
+        max_length=200,
+        description="The blog topic to write about"
+    )
 
 @fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
