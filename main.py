@@ -4,19 +4,15 @@ load_dotenv()
 from langchain_openai import ChatOpenAI
 from typing import Literal, Optional, List, Annotated
 from typing import TypedDict
-from pydantic import BaseModel, ValidationError, Field
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
-from langchain.tools import tool
+from pydantic import BaseModel, Field
+from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 from langchain_community.tools.tavily_search import TavilySearchResults
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 import operator
-import requests
-import re
 
 BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("NVIDIA_API_KEY")
