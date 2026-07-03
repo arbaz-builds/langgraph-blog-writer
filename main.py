@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
-from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_tavily import TavilySearch
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -131,7 +131,7 @@ def router_condition(state: State):
 
 async def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
     try:
-        tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
+        tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
         results = await tool.ainvoke({"query": query})
         normalized: List[dict] = []
         for r in results or []:
