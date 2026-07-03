@@ -131,18 +131,22 @@ def router_condition(state: State):
     return "plan"
 
 async def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
-    tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
-    results = await tool.ainvoke({"query": query})
-    normalized: List[dict] = []
-    for r in results or []:
-        normalized.append({
-            "title": r.get("title") or "",
-            "url": r.get("url") or "",
-            "snippet": r.get("content") or r.get("snippet") or "",
-            "published_at": r.get("published_date") or r.get("published_at"),
-            "source": r.get("source"),
-        })
-    return normalized
+    try:
+        tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
+        results = await tool.ainvoke({"query": query})
+        normalized: List[dict] = []
+        for r in results or []:
+            normalized.append({
+                "title": r.get("title") or "",
+                "url": r.get("url") or "",
+                "snippet": r.get("content") or r.get("snippet") or "",
+                "published_at": r.get("published_date") or r.get("published_at"),
+                "source": r.get("source"),
+            })
+        return normalized
+    except Exception as e:
+        print(f"[Tavily] Search failed for query '{query}': {e}")
+        return []
 
 RESEARCH_SYSTEM = """You are a research synthesizer for technical writing.
 
@@ -166,11 +170,23 @@ async def research_node(state: State) -> dict:
         raw_results.extend(results)
     if not raw_results:
         return {"evidence": []}
-    extractor = general_LLM.with_structured_output(EvidencePack)
-    pack = await extractor.ainvoke([
+
+    messages = [
         SystemMessage(content=RESEARCH_SYSTEM),
         HumanMessage(content=f"Raw results:\n{raw_results}"),
-    ])
+    ]
+    try:
+        extractor = general_LLM.with_structured_output(EvidencePack)
+        pack = await extractor.ainvoke(messages)
+    except Exception as e:
+        print(f"[Research] general_LLM extraction failed: {e}")
+        try:
+            extractor = fallback_LLM.with_structured_output(EvidencePack)
+            pack = await extractor.ainvoke(messages)
+        except Exception as e2:
+            print(f"[Research] fallback_LLM also failed, proceeding with no evidence: {e2}")
+            return {"evidence": []}
+
     dedup = {}
     for e in pack.evidence:
         if e.url:
