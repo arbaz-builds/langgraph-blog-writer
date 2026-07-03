@@ -337,9 +337,11 @@ class QueryRequest(BaseModel):
 
 @fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    messages = [err["msg"] for err in errors]
     return JSONResponse(
         status_code=400,
-        content={"error": "Bad Request", "detail": exc.errors()}
+        content={"error": "Bad Request", "message": "; ".join(messages)}
     )
 
 @fastapi_app.post("/Agent")
