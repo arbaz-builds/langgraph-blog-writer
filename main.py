@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import operator
+import asyncio
 
 BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("NVIDIA_API_KEY")
@@ -132,14 +133,15 @@ def router_condition(state: State):
 async def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
     try:
         tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=max_results)
-        results = await tool.ainvoke({"query": query})
+        response = await tool.ainvoke({"query": query})
+        results = response.get("results", [])
         normalized: List[dict] = []
-        for r in results or []:
+        for r in results:
             normalized.append({
                 "title": r.get("title") or "",
                 "url": r.get("url") or "",
-                "snippet": r.get("content") or r.get("snippet") or "",
-                "published_at": r.get("published_date") or r.get("published_at"),
+                "snippet": r.get("content") or "",
+                "published_at": r.get("published_date"),
                 "source": r.get("source"),
             })
         return normalized
@@ -163,9 +165,9 @@ Rules:
 async def research_node(state: State) -> dict:
     queries = state["router_decision"].query or []
     max_results = 6
+    results_list = await asyncio.gather(*[_tavily_search(q, max_results=max_results) for q in queries])
     raw_results: List[dict] = []
-    for q in queries:
-        results = await _tavily_search(q, max_results=max_results)
+    for results in results_list:
         raw_results.extend(results)
     if not raw_results:
         return {"evidence": []}
