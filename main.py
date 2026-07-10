@@ -331,15 +331,25 @@ blog_graph.add_edge("Worker", END)
 
 compiled_blog_agent = blog_graph.compile()
 
-fastapi_app = FastAPI()
+fastapi_app = FastAPI(
+    title="Blog Writer Agent API",
+    description="Multi-agent LangGraph pipeline: Router → Research → Planning → Parallel Writers",
+    version="1.0.0",
+    contact={"name": "Mohammad Arbaz", "url": "https://github.com/arbaz-builds"},
+)
 
 class QueryRequest(BaseModel):
     query_text: str = Field(
         ...,
         min_length=15,
         max_length=200,
-        description="The blog topic to write about"
+        description="The blog topic to write about",
+        examples=["How AI agents are changing software development"],
     )
+
+class BlogResponse(BaseModel):
+    blog_title: str
+    sections: List[str]
 
 @fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -350,7 +360,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"error": "Bad Request", "message": "; ".join(messages)}
     )
 
-@fastapi_app.post("/Agent")
+@fastapi_app.post(
+    "/Agent",
+    summary="Generate a blog post",
+    description="Takes a topic and returns a fully researched, structured blog post with title and sections.",
+    response_description="Blog title and list of markdown sections",
+    response_model=BlogResponse,
+    tags=["Blog Generation"],
+)
 async def BlogAgent(request: QueryRequest):
     try:
         inputs = {"topic": request.query_text}
