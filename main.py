@@ -170,7 +170,7 @@ async def research_node(state: State) -> dict:
     for results in results_list:
         raw_results.extend(results)
     if not raw_results:
-        return {"evidence": []}
+        return {"evidence": None}
 
     messages = [
         SystemMessage(content=RESEARCH_SYSTEM),
@@ -186,13 +186,13 @@ async def research_node(state: State) -> dict:
             pack = await extractor.ainvoke(messages)
         except Exception as e2:
             print(f"[Research] fallback_LLM also failed, proceeding with no evidence: {e2}")
-            return {"evidence": []}
+            return {"evidence": None}
 
     dedup = {}
     for e in pack.evidence:
         if e.url:
             dedup[e.url] = e
-    return {"evidence": list(dedup.values())}
+    return {"evidence": EvidencePack(evidence=list(dedup.values()))}
 
 System_message_planner = """You are a blog planning agent.
 
