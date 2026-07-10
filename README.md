@@ -6,7 +6,7 @@
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-API-76B900.svg)](https://integrate.api.nvidia.com)
 [![Tavily](https://img.shields.io/badge/Tavily-Search-orange.svg)](https://tavily.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-red.svg)](https://langgraph-blog-agent-1.onrender.com/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-red.svg)](https://langgraph-blog-writer-pl4n.onrender.com/)
 
 > A production-grade multi-agent blog generation system powered by LangGraph, NVIDIA LLMs, and real-time web research via Tavily. Give it a topic — it researches, plans, and writes a complete structured blog post using parallel AI workers.
 
@@ -14,10 +14,10 @@
 
 ## 🚀 Live Demo
 
-**Try it now:** [https://langgraph-blog-agent-1.onrender.com/docs](https://langgraph-blog-agent-1.onrender.com/docs)
+**Try it now:** [https://langgraph-blog-writer-pl4n.onrender.com/docs](https://langgraph-blog-writer-pl4n.onrender.com/docs)
 
 ```bash
-curl -X POST "https://langgraph-blog-agent-1.onrender.com/Agent" \
+curl -X POST "https://langgraph-blog-writer-pl4n.onrender.com/Agent" \
      -H "Content-Type: application/json" \
      -d '{"query_text": "What is Retrieval Augmented Generation?"}'
 ```
