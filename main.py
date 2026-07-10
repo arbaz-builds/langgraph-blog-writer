@@ -275,13 +275,18 @@ Requirements:
 - Fulfill the Section Goal.
 - Cover ALL Bullets in the given order.
 - Stay close to the Target Words count (+-15%).
-- Use Evidence for factual claims when provided.
-- Include concise examples where they improve understanding.
 - Use short paragraphs, lists, and code blocks only when helpful.
 - Be clear, practical, and engaging.
 - Avoid fluff, repetition, hype, and generic AI phrasing.
 - Do not write content outside this section.
-- Output only the section Markdown."""
+- Output only the section Markdown.
+
+STRICT EVIDENCE RULES (critical):
+- Only state a specific number, statistic, percentage, date, company name, or named example if it appears explicitly in the Evidence provided.
+- If Evidence is empty or does not cover a bullet, write that bullet qualitatively (e.g. "a growing share of jobs", "significant cost declines") instead of inventing a figure.
+- Never invent company names, project names, case studies, or examples that are not present in Evidence.
+- If you use a number from Evidence, it must match exactly (do not round, extrapolate, or combine numbers from different sources into a new invented figure).
+- It is better to write a shorter, vaguer section than to fabricate a specific-sounding fact."""
 
 async def worker_node(payload: dict) -> dict:
     task = payload["task"]
