@@ -6,7 +6,7 @@ either an EvidencePack instance or None for the "evidence" key - never a
 raw list.
 """
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from main import research_node, EvidencePack, EvidenceItem, RouterStructured
 
@@ -45,12 +45,12 @@ async def test_successful_extraction_returns_evidencepack_not_list():
         evidence=[EvidenceItem(title="RAG Guide", url="https://example.com/rag")]
     )
 
-    mock_extractor = AsyncMock(return_value=fake_pack)
+    mock_bound_llm = MagicMock()
+    mock_bound_llm.ainvoke = AsyncMock(return_value=fake_pack)
 
     with patch("main._tavily_search", new=AsyncMock(return_value=fake_results)), \
-         patch("main.general_LLM.with_structured_output", return_value=type(
-             "MockLLM", (), {"ainvoke": mock_extractor}
-         )()):
+         patch.object(type(__import__("main").general_LLM), "with_structured_output",
+                       return_value=mock_bound_llm):
         result = await research_node(state)
 
     # The critical regression check: evidence must be an EvidencePack, never a plain list
@@ -70,12 +70,12 @@ async def test_deduplicates_by_url():
             EvidenceItem(title="B", url="https://y.com"),
         ]
     )
-    mock_extractor = AsyncMock(return_value=dup_pack)
+    mock_bound_llm = MagicMock()
+    mock_bound_llm.ainvoke = AsyncMock(return_value=dup_pack)
 
     with patch("main._tavily_search", new=AsyncMock(return_value=fake_results)), \
-         patch("main.general_LLM.with_structured_output", return_value=type(
-             "MockLLM", (), {"ainvoke": mock_extractor}
-         )()):
+         patch.object(type(__import__("main").general_LLM), "with_structured_output",
+                       return_value=mock_bound_llm):
         result = await research_node(state)
 
     assert isinstance(result["evidence"], EvidencePack)
