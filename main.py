@@ -363,6 +363,7 @@ class BlogResponse(BaseModel):
     sections: List[str]
     plan: Plan
     evidence: Optional[EvidencePack] = None
+    router_decision: RouterStructured
 
 @fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -389,7 +390,8 @@ async def BlogAgent(request: QueryRequest):
             "blog_title": result["plan"].blog_title,
             "sections": result["sections"],
             "plan": result.get("plan"),
-            "evidence": result.get("evidence")
+            "evidence": result.get("evidence"),
+            "router_decision": result.get("router_decision")
         }
     except Exception as e:
         print(f"[BlogAgent] Server-side error: {e}")
