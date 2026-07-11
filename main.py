@@ -352,7 +352,9 @@ fastapi_app = FastAPI(
 class QueryRequest(BaseModel):
     query_text: str = Field(
         ...,
-        description="The blog topic to write about (15-200 characters)",
+        min_length=15,
+        max_length=200,
+        description="The blog topic to write about",
         examples=["How AI agents are changing software development"],
     )
 
@@ -376,25 +378,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     response_description="Blog title and list of markdown sections",
     response_model=BlogResponse,
     tags=["Blog Generation"],
-    responses={
-        400: {
-            "description": "Bad Request - invalid query_text (must be 15-200 characters)",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "query_text must be between 15 and 200 characters"
-                    }
-                }
-            },
-        }
-    },
 )
 async def BlogAgent(request: QueryRequest):
-    if len(request.query_text) < 15 or len(request.query_text) > 200:
-        raise HTTPException(
-            status_code=400,
-            detail="query_text must be between 15 and 200 characters"
-        )
     try:
         inputs = {"topic": request.query_text}
         result = await compiled_blog_agent.ainvoke(inputs)
