@@ -210,8 +210,12 @@ Rules:
   - target_words: 150-400 per section
   - section_type: exactly one of [intro, core, examples, checklist, common_mistakes, conclusion]
 - Use 'common_mistakes' section type exactly once
-- Use evidence URLs for grounding claims where available
-- Do NOT use generic filler — every section must add value"""
+- Do NOT use generic filler — every section must add value
+
+EVIDENCE USAGE:
+- If Evidence is provided, assign each bullet that maps to a specific evidence fact so the Worker can cite it later — phrase that bullet around the concrete fact (e.g. "X company's Y% reduction in Z"), not a vague restatement of it.
+- If Evidence is empty or does not cover a section, write that section's bullets as conceptual/qualitative points — do not reference "evidence" or "sources" in the bullet text itself.
+- Do not distribute the same evidence fact across multiple sections — each fact should be planned into exactly one section to avoid repetition."""
 
 async def orchestrator(state: State) -> dict:
     research = state.get("evidence")
@@ -286,7 +290,14 @@ STRICT EVIDENCE RULES (critical):
 - If Evidence is empty or does not cover a bullet, write that bullet qualitatively (e.g. "a growing share of jobs", "significant cost declines") instead of inventing a figure.
 - Never invent company names, project names, case studies, or examples that are not present in Evidence.
 - If you use a number from Evidence, it must match exactly (do not round, extrapolate, or combine numbers from different sources into a new invented figure).
-- It is better to write a shorter, vaguer section than to fabricate a specific-sounding fact."""
+- It is better to write a shorter, vaguer section than to fabricate a specific-sounding fact.
+
+CITATION RULES:
+- When you use a specific fact, number, or claim from Evidence, cite it inline immediately after the sentence using the format: (Source: [domain or short name](url)).
+- Do not cite general knowledge or your own qualitative reasoning — only cite facts that came from Evidence.
+- If the same source supports multiple sentences in a row, cite it once at the end of that group, not after every sentence.
+- Never fabricate a URL. Only use URLs that appear verbatim in Evidence.
+- If Evidence is empty, write the section with no citations at all."""
 
 async def worker_node(payload: dict) -> dict:
     task = payload["task"]
@@ -341,9 +352,7 @@ fastapi_app = FastAPI(
 class QueryRequest(BaseModel):
     query_text: str = Field(
         ...,
-        min_length=15,
-        max_length=200,
-        description="The blog topic to write about",
+        description="The blog topic to write about (15-200 characters)",
         examples=["How AI agents are changing software development"],
     )
 
@@ -367,8 +376,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     response_description="Blog title and list of markdown sections",
     response_model=BlogResponse,
     tags=["Blog Generation"],
+    responses={
+        400: {
+            "description": "Bad Request - invalid query_text (must be 15-200 characters)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "query_text must be between 15 and 200 characters"
+                    }
+                }
+            },
+        }
+    },
 )
 async def BlogAgent(request: QueryRequest):
+    if len(request.query_text) < 15 or len(request.query_text) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="query_text must be between 15 and 200 characters"
+        )
     try:
         inputs = {"topic": request.query_text}
         result = await compiled_blog_agent.ainvoke(inputs)
