@@ -1,20 +1,14 @@
-# 🤖 LangGraph Blog Writer — Multi-Agent AI Blog Generation System
+# LangGraph Blog Writer — Multi-Agent Blog Generation System
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://github.com/langchain-ai/langgraph)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688.svg)](https://fastapi.tiangolo.com)
-[![NVIDIA](https://img.shields.io/badge/NVIDIA-API-76B900.svg)](https://integrate.api.nvidia.com)
-[![Tavily](https://img.shields.io/badge/Tavily-Search-orange.svg)](https://tavily.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-red.svg)](https://langgraph-blog-writer-pl4n.onrender.com/)
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://python.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph-latest-green)](https://github.com/langchain-ai/langgraph)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-teal)](https://fastapi.tiangolo.com)
+[![Tests](https://github.com/arbaz-builds/langgraph-blog-writer/actions/workflows/tests.yml/badge.svg)](https://github.com/arbaz-builds/langgraph-blog-writer/actions/workflows/tests.yml)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-> A production-grade multi-agent blog generation system powered by LangGraph, NVIDIA LLMs, and real-time web research via Tavily. Give it a topic — it researches, plans, and writes a complete structured blog post using parallel AI workers.
+A multi-agent blog-generation pipeline built with LangGraph. Give it a topic — it decides whether the topic needs live research, plans a structured outline, then writes every section **in parallel** using LangGraph's `Send()` fan-out API.
 
----
-
-## 🚀 Live Demo
-
-**Try it now:** [https://langgraph-blog-writer-pl4n.onrender.com/docs](https://langgraph-blog-writer-pl4n.onrender.com/docs)
+**Live API:** `https://langgraph-blog-writer-pl4n.onrender.com` — interactive docs at `/docs`
 
 ```bash
 curl -X POST "https://langgraph-blog-writer-pl4n.onrender.com/Agent" \
@@ -24,190 +18,167 @@ curl -X POST "https://langgraph-blog-writer-pl4n.onrender.com/Agent" \
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-User Query
+User topic
     │
     ▼
-┌─────────┐
-│  Router │  ← DeepSeek V4 Flash — classifies: research or planning
-└────┬────┘
-     │
-     ├──── research ────▶ ┌──────────────┐
-     │                    │ Research Node │  ← Tavily multi-query web search
-     │                    │              │     + LLM evidence synthesis
-     │                    └──────┬───────┘
-     │                           │
-     └──── planning ─────────────▼
-                          ┌──────────────┐
-                          │ Orchestrator │  ← GPT-OSS 120B — creates structured blog plan
-                          │              │     (5-7 sections with goals, bullets, word targets)
-                          └──────┬───────┘
-                                 │
-                    ┌────────────┼────────────┐
-                    │  LangGraph Send() API   │
-                    ▼            ▼            ▼
-               ┌────────┐  ┌────────┐  ┌────────┐
-               │Worker 1│  │Worker 2│  │Worker N│  ← Parallel section writers
-               └────┬───┘  └────┬───┘  └────┬───┘
-                    └───────────┴────────────┘
-                                │
-                                ▼
-                        Final Blog Post
+┌────────┐
+│ Router │  DeepSeek V4 Flash — classifies: research or planning
+└───┬────┘
+    │
+    ├── research ──▶ ┌───────────────┐
+    │                │  research     │  Tavily: 2-8 parallel search queries
+    │                │  node         │  → LLM synthesizes an EvidencePack
+    │                └───────┬───────┘
+    │                        │
+    └── planning ────────────▼
+                     ┌───────────────┐
+                     │ orchestrator  │  GPT-OSS 120B builds a structured Plan:
+                     │               │  title, audience, tone, 5-7 Tasks
+                     └───────┬───────┘
+                             │
+                  Send() fan-out (one per Task)
+                 ┌───────────┼───────────┐
+                 ▼           ▼           ▼
+            ┌────────┐  ┌────────┐  ┌────────┐
+            │Worker 1│  │Worker 2│  │Worker N│   parallel section writers
+            └───┬────┘  └───┬────┘  └───┬────┘
+                 └───────────┴───────────┘
+                             │
+                             ▼
+                    sections merged (operator.add)
+                             │
+                             ▼
+                     Final blog response
 ```
 
----
+## How it works
 
-## ✨ Key Features
+1. **Router** — a structured-output call to `deepseek-ai/deepseek-v4-flash` classifies the topic as `research` (needs current/external facts) or `planning` (answerable from the model's own knowledge).
+2. **Research** *(if routed there)* — runs 2-8 Tavily search queries **concurrently** (`asyncio.gather`), then has an LLM deduplicate and structure the raw results into an `EvidencePack` (title, url, snippet, date per item).
+3. **Orchestrator** — turns the topic (+ evidence, if any) into a `Plan`: blog title, audience, tone, and 5-7 `Task` objects, each with a goal, 3-5 bullets, a target word count, and a section type (exactly one `common_mistakes` section is required).
+4. **Fan-out** — `Send()` dispatches every `Task` to a `Worker` node simultaneously — sections are written in parallel, not one after another.
+5. **Worker** — writes one Markdown section per task, grounded strictly in the evidence it was given (see "Evidence discipline" below).
+6. Sections are collected via `operator.add` into the final response.
 
-- **Intelligent Query Routing** — DeepSeek V4 Flash classifies each query: needs research or can be answered from knowledge alone
-- **Real-Time Web Research** — Tavily runs 2–8 targeted search queries in parallel, synthesizes authoritative evidence
-- **Structured Blog Planning** — GPT-OSS 120B generates a complete plan: title, audience, tone, 5–7 sections with goals and word targets
-- **Parallel Section Writing** — LangGraph's `Send()` API fans out all sections to independent worker agents simultaneously — zero sequential bottleneck
-- **Pydantic-Validated Outputs** — Every LLM output is schema-validated (`RouterStructured`, `Plan`, `Task`, `EvidencePack`) — no hallucinated structure
-- **Production Deployed** — FastAPI + Render deployment, live and callable via REST API
+## Evidence discipline
 
----
+The worker prompt enforces some deliberate anti-hallucination rules:
+- Numbers, dates, company names, or named examples may only appear if they're present verbatim in the `EvidencePack` — the model is instructed to write qualitatively ("a growing share of jobs") rather than invent a specific-sounding stat.
+- Facts drawn from evidence are cited inline as `(Source: [name](url))`; URLs are never fabricated.
+- If evidence is empty, the section is written with no citations at all rather than faking one.
 
-## 🛠️ Tech Stack
+## Resilience / fallback chains
 
-| Layer | Technology |
-|---|---|
-| **Orchestration** | LangGraph (StateGraph, Send API) |
-| **LLMs** | NVIDIA API — DeepSeek V4 Flash (routing), GPT-OSS 120B (planning + writing) |
-| **Web Search** | Tavily Search API |
-| **API Framework** | FastAPI |
-| **Data Validation** | Pydantic v2 |
-| **Deployment** | Render |
+Router, research synthesis, and planning each try `general_LLM` (`openai/gpt-oss-120b`) first and fall back to `fallback_LLM` (`mistralai/mistral-nemotron`) on failure, with a final rule-based 4-section plan if both LLMs fail during planning. Both models are served through NVIDIA's API, which is a **known limitation**: under heavy concurrent load the free-tier endpoint has been observed returning `429`/degraded-function errors, occasionally for both models on the same request.
 
----
+> **Known gap:** the worker node's fallback call is not itself wrapped in a try/except — if `general_LLM` *and* `fallback_LLM` both fail for a given section, that exception currently propagates up to a generic 500 instead of degrading gracefully. Everywhere else (router, research, orchestrator) both LLM attempts are guarded.
 
-## 📁 Project Structure
+## Testing & CI
+
+The pipeline's pure control-flow logic is unit-tested with pytest, and every push/PR to `main` runs the suite via GitHub Actions:
+
+- **`test_graph_logic.py`** — `router_condition` and `fanout` (no LLM calls, deterministic)
+- **`test_schemas.py`** — Pydantic model validation (`Task`, `Plan`, `EvidencePack`, etc.)
+- **`test_research_node.py`** — research node behavior with mocked search/LLM calls
+
+```bash
+pip install -r requirements.txt -r requirements-test.txt
+pytest tests/ -v
+```
+
+CI runs against dummy API keys — the tests exercise routing/validation logic, not live LLM or search calls.
+
+## Project structure
 
 ```
 langgraph-blog-writer/
-├── main.py              # Full agent graph + FastAPI app
-├── requirements.txt     # Dependencies
-├── render.yaml          # Render deployment config
-├── .env.example         # Environment variables template
-└── .gitignore
+├── main.py                      # Graph definition + FastAPI app
+├── tests/
+│   ├── test_graph_logic.py
+│   ├── test_research_node.py
+│   └── test_schemas.py
+├── .github/workflows/tests.yml  # CI: runs pytest on every push/PR
+├── render.yaml                  # Render deployment config
+├── requirements.txt
+├── requirements-test.txt
+└── .env.example
 ```
 
----
-
-## ⚙️ Setup & Installation
-
-### 1. Clone the repository
+## Setup & installation
 
 ```bash
 git clone https://github.com/arbaz-builds/langgraph-blog-writer.git
 cd langgraph-blog-writer
-```
-
-### 2. Install dependencies
-
-```bash
 pip install -r requirements.txt
-```
-
-### 3. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your API keys:
-
-```env
-NVIDIA_API_KEY=your_nvidia_api_key_here
-NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-TAVILY_API_KEY=your_tavily_api_key_here
-```
-
-### 4. Run the server
-
-```bash
+cp .env.example .env   # fill in your API keys
 uvicorn main:fastapi_app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. Test it
-
-```bash
-curl -X POST "http://localhost:8000/Agent" \
-     -H "Content-Type: application/json" \
-     -d '{"query_text": "How does LangGraph work?"}'
-```
-
----
-
-## 📡 API Reference
+## API reference
 
 ### `POST /Agent`
 
-Generate a complete blog post from a topic query.
-
-**Request:**
+**Request**
 ```json
 {
   "query_text": "What is Retrieval Augmented Generation?"
 }
 ```
+`query_text` must be 15-200 characters.
 
-**Response:**
+**Response**
 ```json
 {
   "blog_title": "RAG Explained: How AI Systems Retrieve and Generate Accurate Answers",
   "sections": [
     "## Introduction\n\nRetrieval-Augmented Generation (RAG)...",
     "## How RAG Works\n\n...",
-    "## Real-World Applications\n\n...",
     "## Common Mistakes\n\n...",
     "## Conclusion\n\n..."
-  ]
+  ],
+  "plan": { "blog_title": "...", "audience": "...", "tone": "...", "tasks": [ ] },
+  "evidence": { "evidence": [ { "title": "...", "url": "...", "snippet": "..." } ] },
+  "router_decision": { "reasoning": "...", "route": "research", "query": ["..."] }
 }
 ```
 
-**Interactive docs:** `/docs` (Swagger UI)
+The response includes the full `plan`, `evidence`, and `router_decision` alongside the generated `sections` — useful for debugging or displaying how the agent arrived at the final post, not just the post itself.
 
----
+Interactive docs: `/docs` (Swagger UI).
 
-## 🧠 How It Works — Step by Step
+## Environment variables
 
-1. **User sends a topic** via POST `/Agent`
-2. **Router Node** — DeepSeek classifies whether the topic needs real-time research or can be planned directly
-3. **Research Node** (if needed) — Tavily executes multiple targeted searches, LLM synthesizes evidence into a clean `EvidencePack`
-4. **Orchestrator Node** — GPT-OSS 120B creates a detailed `Plan` with blog title, audience, tone, and 5–7 structured `Task` objects
-5. **Fan-out via Send()** — LangGraph dispatches all tasks to parallel `Worker` agents simultaneously
-6. **Worker Nodes** — Each worker writes one complete blog section in Markdown, grounded in evidence
-7. **State aggregation** — All sections are collected via `operator.add` into the final blog
+| Variable | Required | Purpose |
+|---|---|---|
+| `NVIDIA_API_KEY` | ✅ | LLM inference (router, planner, workers) |
+| `TAVILY_API_KEY` | ✅ | Web search for the research node |
+| `NVIDIA_BASE_URL` | optional | Defaults to `https://integrate.api.nvidia.com/v1` |
 
----
+## Tech stack
 
-## 🔑 Getting API Keys
-
-| Service | Link |
+| Layer | Technology |
 |---|---|
-| NVIDIA API | [integrate.api.nvidia.com](https://integrate.api.nvidia.com) |
-| Tavily Search | [tavily.com](https://tavily.com) |
+| Orchestration | LangGraph (`StateGraph`, `Send()` fan-out) |
+| LLMs | NVIDIA API — `deepseek-v4-flash` (routing), `gpt-oss-120b` (primary), `mistral-nemotron` (fallback) |
+| Web search | Tavily |
+| API framework | FastAPI |
+| Validation | Pydantic v2 |
+| Testing | pytest + GitHub Actions |
+| Deployment | Render |
 
----
+## Related projects
 
-## 🤝 Related Projects
+- [langgraph-multi-agent](https://github.com/arbaz-builds/langgraph-multi-agent) — multi-agent chatbot with RAG, web search, and Python execution via MCP
+- [fastmcp-python-repl-server](https://github.com/arbaz-builds/fastmcp-python-repl-server) — the MCP Python REPL server used by the multi-agent chatbot
 
-- [langgraph-multi-agent](https://github.com/arbaz-builds/langgraph-multi-agent) — Production multi-agent chatbot with RAG, web search, and Python execution via MCP
-- [fastmcp-python-repl-server](https://github.com/arbaz-builds/fastmcp-python-repl-server) — Secure sandboxed Python REPL server implementing the Model Context Protocol
-
----
-
-## 👤 Author
+## Author
 
 **Mohammad Arbaz** — AI/LLM Engineer
-- GitHub: [@arbaz-builds](https://github.com/arbaz-builds)
-- Email: arwazrozi@gmail.com
+[GitHub @arbaz-builds](https://github.com/arbaz-builds) · arwazrozi@gmail.com
 
----
+## License
 
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
