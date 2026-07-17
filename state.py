@@ -1,5 +1,7 @@
 from typing import Literal, Optional, List, Annotated, TypedDict
 from pydantic import BaseModel, Field
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 import operator
 
 
@@ -61,6 +63,7 @@ class EvidencePack(BaseModel):
 
 
 class State(TypedDict):
+    memory: Annotated[List[BaseMessage], add_messages]
     topic: str
     router_decision: RouterStructured
     plan: Plan
