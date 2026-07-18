@@ -2,6 +2,7 @@ langchain-openai
 langchain-community
 langchain
 langgraph
+langgraph-checkpoint-postgres
 langchain-tavily
 fastapi
 uvicorn
