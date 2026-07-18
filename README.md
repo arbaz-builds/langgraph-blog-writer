@@ -6,14 +6,14 @@
 [![Tests](https://github.com/arbaz-builds/langgraph-blog-writer/actions/workflows/tests.yml/badge.svg)](https://github.com/arbaz-builds/langgraph-blog-writer/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-A multi-agent blog-generation pipeline built with LangGraph. Give it a topic — it decides whether the topic needs live research, plans a structured outline, then writes every section **in parallel** using LangGraph's `Send()` fan-out API.
+A multi-agent blog-generation pipeline built with LangGraph. Give it a topic — it decides whether the topic needs live research, plans a structured outline, then writes every section **in parallel** using LangGraph's `Send()` fan-out API. Conversation state is persisted in PostgreSQL, so each `thread_id` keeps its own history across requests.
 
 **Live API:** `https://langgraph-blog-writer-pl4n.onrender.com` — interactive docs at `/docs`
 
 ```bash
 curl -X POST "https://langgraph-blog-writer-pl4n.onrender.com/Agent" \
      -H "Content-Type: application/json" \
-     -d '{"query_text": "What is Retrieval Augmented Generation?"}'
+     -d '{"query_text": "What is Retrieval Augmented Generation?", "thread_id": "1"}'
 ```
 
 ---
@@ -155,6 +155,7 @@ Interactive docs: `/docs` (Swagger UI).
 |---|---|---|
 | `NVIDIA_API_KEY` | ✅ | LLM inference (router, planner, workers) |
 | `TAVILY_API_KEY` | ✅ | Web search for the research node |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string for conversation memory (checkpointer) |
 | `NVIDIA_BASE_URL` | optional | Defaults to `https://integrate.api.nvidia.com/v1` |
 
 ## Tech stack
