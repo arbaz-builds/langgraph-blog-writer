@@ -63,6 +63,14 @@ User topic
 5. **Worker** — writes one Markdown section per task, grounded strictly in the evidence it was given (see "Evidence discipline" below).
 6. Sections are collected via `operator.add` into the final response.
 
+## Memory
+
+Conversation state is persisted in PostgreSQL via LangGraph's `AsyncPostgresSaver` — each request's `thread_id` keeps its own history, so a follow-up request with the same `thread_id` continues from where the last one left off.
+
+A fresh Postgres connection is opened per request rather than reused, to avoid holding onto a stale/dead connection after a provider-side idle timeout (e.g. Neon auto-suspend).
+
+**Known limitation:** `nodes/intro_router.py` exists (an `IntroDecision`-based node meant to detect whether a message is a genuine blog request vs. casual chat, and build a refined topic from the conversation) but is **not yet wired into the graph**. Right now every request is treated as a direct blog request — the raw `query_text` is stored in `memory` and the graph starts straight at `Router`.
+
 ## Evidence discipline
 
 The worker prompt enforces some deliberate anti-hallucination rules:
