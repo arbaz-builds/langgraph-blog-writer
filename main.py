@@ -1,11 +1,16 @@
-"""FastAPI app — exposes the blog-writing graph over HTTP."""
+"""FastAPI app — exposes the blog-writing graph over HTTP, with Postgres-backed memory."""
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from state import Plan, EvidencePack, RouterStructured
-from graph import compiled_blog_agent
+from graph import blog_graph
+import config
+
+config.validate()
 
 fastapi_app = FastAPI(
     title="Blog Writer Agent API",
@@ -22,6 +27,10 @@ class QueryRequest(BaseModel):
         max_length=200,
         description="The blog topic to write about",
         examples=["How AI agents are changing software development"],
+    )
+    thread_id: str = Field(
+        default="1",
+        description="Conversation/session ID — used to persist memory across requests.",
     )
 
 
@@ -43,6 +52,24 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+async def _invoke(query_text: str, thread_id: str = "1") -> dict:
+    """Shared logic: fresh Postgres connection per call, run one turn,
+    return the full result dict.
+
+    A new connection is opened each time (instead of one long-lived
+    connection) so we never reuse a stale/dead TCP connection left over
+    from a provider-side idle timeout (e.g. Neon auto-suspend, Render
+    free-tier sleep) — same pattern as langgraph-multi-agent.
+    """
+    async with AsyncPostgresSaver.from_conn_string(config.DATABASE_URL) as cp:
+        await cp.setup()
+        result = await blog_graph.compile(checkpointer=cp).ainvoke(
+            {"memory": [HumanMessage(content=query_text)], "topic": query_text},
+            config={"configurable": {"thread_id": thread_id}},
+        )
+    return result
+
+
 @fastapi_app.post(
     "/Agent",
     summary="Generate a blog post",
@@ -53,8 +80,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 )
 async def BlogAgent(request: QueryRequest):
     try:
-        inputs = {"topic": request.query_text}
-        result = await compiled_blog_agent.ainvoke(inputs)
+        result = await _invoke(request.query_text, request.thread_id)
         return {
             "blog_title": result["plan"].blog_title,
             "sections": result["sections"],
