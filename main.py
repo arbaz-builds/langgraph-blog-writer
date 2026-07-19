@@ -75,14 +75,16 @@ async def _invoke(query_text: str, thread_id: str = "1") -> dict:
 @fastapi_app.post(
     "/Agent",
     summary="Generate a blog post",
-    description="Takes a topic and returns a fully researched, structured blog post with title and sections.",
-    response_description="Blog title and list of markdown sections",
-    response_model=BlogResponse,
+    description="Takes a topic and returns a fully researched, structured blog post with title and sections, or a clarifying reply if more detail is needed.",
+    response_description="Blog title and list of markdown sections, or a clarifying reply",
     tags=["Blog Generation"],
 )
 async def BlogAgent(request: QueryRequest):
     try:
         result = await _invoke(request.query_text, request.thread_id)
+        if "plan" not in result:
+            # intro_router decided this wasn't a blog request yet
+            return {"reply": result["memory"][-1].content}
         return {
             "blog_title": result["plan"].blog_title,
             "sections": result["sections"],
