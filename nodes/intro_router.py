@@ -34,6 +34,14 @@ async def intro_router(state: State) -> dict:
         *state["memory"][-6:],
     ]
     output = await structured_llm.ainvoke(messages)
+    
+    if output is None:
+        # model didn't call the tool — fallback response
+        return {
+            "memory": [AIMessage(content="I'm a Blog Writing Agent. What topic would you like a blog about?")],
+            "topic": "",
+            "decision": "unclear"
+        }
 
     return {
         "memory": [AIMessage(content=output.reply)],
