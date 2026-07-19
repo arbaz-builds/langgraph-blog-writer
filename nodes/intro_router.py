@@ -40,3 +40,10 @@ async def intro_router(state: State) -> dict:
         "topic": output.RefindTopic,
         "decision": output.decision
     }
+
+
+def intro_router_condition(state: State):
+    decision = state.get("decision")
+    if decision == "blog_request":
+        return "router"
+    return "END"
