@@ -38,5 +38,5 @@ async def intro_router(state: State) -> dict:
     return {
         "memory": [AIMessage(content=output.reply)],
         "topic": output.RefindTopic,
-        "decision": output.dicision
+        "decision": output.decision
     }
