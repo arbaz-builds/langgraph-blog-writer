@@ -64,7 +64,7 @@ class EvidencePack(BaseModel):
 
 class State(TypedDict):
     memory: Annotated[List[BaseMessage], add_messages]
-    dicision:str
+    decision:str
     topic: str
     router_decision: RouterStructured
     plan: Plan
