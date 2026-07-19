@@ -71,6 +71,13 @@ async def _invoke(query_text: str, thread_id: str = "1") -> dict:
         )
     return result
 
+@fastapi_app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "blog-writer-api"
+    }
+
 
 @fastapi_app.post(
     "/Agent",
