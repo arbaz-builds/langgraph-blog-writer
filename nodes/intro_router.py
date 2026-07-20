@@ -31,7 +31,7 @@ async def intro_router(state: State) -> dict:
     structured_llm = router_llm.with_structured_output(IntroDecision)
     messages = [
         SystemMessage(content=INTRO_SYSTEM),
-        *state["memory"][-6:],
+        HumanMessage(content="hi"),
     ]
     output = await structured_llm.ainvoke(messages)
     
