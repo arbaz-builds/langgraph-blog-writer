@@ -3,7 +3,7 @@ user wants a blog written or is just chatting, and builds a polished topic
 once enough detail has been gathered across the conversation."""
 from langchain_core.messages import SystemMessage, AIMessage
 from state import State, IntroDecision
-from llms import router_llm
+from llms import router_llm, fallback_LLM
 
 INTRO_SYSTEM = """You are the entry point of a Blog Writing Agent. This agent
 ONLY writes blogs — it cannot chat casually, answer unrelated questions, or
@@ -28,15 +28,24 @@ planning stage. Set it to null (not an empty string) if decision="unclear"."""
 
 
 async def intro_router(state: State) -> dict:
-    structured_llm = router_llm.with_structured_output(IntroDecision)
     messages = [
         SystemMessage(content=INTRO_SYSTEM),
         *state["memory"][-6:],
     ]
-    output = await structured_llm.ainvoke(messages)
-    
+    try:
+        structured_llm = router_llm.with_structured_output(IntroDecision, method="function_calling")
+        output = await structured_llm.ainvoke(messages)
+    except Exception as e:
+        print(f"[IntroRouter] router_llm failed, falling back: {e}")
+        try:
+            structured_llm = fallback_LLM.with_structured_output(IntroDecision, method="function_calling")
+            output = await structured_llm.ainvoke(messages)
+        except Exception as e2:
+            print(f"[IntroRouter] fallback_LLM also failed: {e2}")
+            output = None
+
     if output is None:
-        # model didn't call the tool — fallback response
+        # both LLMs failed — fallback response
         return {
             "memory": [AIMessage(content="I'm a Blog Writing Agent. What topic would you like a blog about?")],
             "topic": "",
