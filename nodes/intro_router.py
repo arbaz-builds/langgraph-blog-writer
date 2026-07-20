@@ -1,7 +1,7 @@
 """Intro router node — the entry point of the graph. Determines whether the
 user wants a blog written or is just chatting, and builds a polished topic
 once enough detail has been gathered across the conversation."""
-from langchain_core.messages import SystemMessage, AIMessage, HumanMessage 
+from langchain_core.messages import SystemMessage, AIMessage
 from state import State, IntroDecision
 from llms import router_llm
 
@@ -31,7 +31,7 @@ async def intro_router(state: State) -> dict:
     structured_llm = router_llm.with_structured_output(IntroDecision)
     messages = [
         SystemMessage(content=INTRO_SYSTEM),
-        HumanMessage(content="hi"),
+        *state["memory"][-6:],
     ]
     output = await structured_llm.ainvoke(messages)
     
