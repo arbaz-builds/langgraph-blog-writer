@@ -24,7 +24,7 @@ Always fill "reply":
 
 If decision="blog_request", also fill "RefindTopic" with a clean, polished
 topic description built from the conversation, ready to hand off to the
-planning stage. Leave it empty if decision="unclear"."""
+planning stage. Set it to null (not an empty string) if decision="unclear"."""
 
 
 async def intro_router(state: State) -> dict:
