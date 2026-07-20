@@ -4,7 +4,7 @@ once enough detail has been gathered across the conversation."""
 import logging
 from langchain_core.messages import SystemMessage, AIMessage
 from state import State, IntroDecision
-from llms import router_llm, fallback_LLM
+from llms import general_LLM, fallback_LLM
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +36,11 @@ async def intro_router(state: State) -> dict:
         *state["memory"][-6:],
     ]
     try:
-        structured_llm = router_llm.with_structured_output(IntroDecision, method="function_calling")
+        structured_llm = general_LLM.with_structured_output(IntroDecision, method="function_calling")
         output = await structured_llm.ainvoke(messages)
-        logger.info(f"[IntroRouter] router_llm output: {output!r}")
+        logger.info(f"[IntroRouter] general_LLM output: {output!r}")
     except Exception as e:
-        logger.exception(f"[IntroRouter] router_llm failed: {e}")
+        logger.exception(f"[IntroRouter] general_LLM failed: {e}")
         structured_llm = fallback_LLM.with_structured_output(IntroDecision, method="function_calling")
         output = await structured_llm.ainvoke(messages)
         logger.info(f"[IntroRouter] fallback_LLM output: {output!r}")
