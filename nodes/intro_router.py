@@ -1,7 +1,7 @@
 """Intro router node — the entry point of the graph. Determines whether the
 user wants a blog written or is just chatting, and builds a polished topic
 once enough detail has been gathered across the conversation."""
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage 
 from state import State, IntroDecision
 from llms import router_llm
 
