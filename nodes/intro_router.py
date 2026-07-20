@@ -28,7 +28,7 @@ planning stage. Set it to null (not an empty string) if decision="unclear"."""
 
 
 async def intro_router(state: State) -> dict:
-    structured_llm = router_llm.with_structured_output(IntroDecision, method="function_calling")
+    structured_llm = router_llm.with_structured_output(IntroDecision)
     messages = [
         SystemMessage(content=INTRO_SYSTEM),
         *state["memory"][-6:],
