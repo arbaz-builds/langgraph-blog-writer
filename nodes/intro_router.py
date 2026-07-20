@@ -1,9 +1,12 @@
 """Intro router node — the entry point of the graph. Determines whether the
 user wants a blog written or is just chatting, and builds a polished topic
 once enough detail has been gathered across the conversation."""
+import logging
 from langchain_core.messages import SystemMessage, AIMessage
 from state import State, IntroDecision
 from llms import router_llm, fallback_LLM
+
+logger = logging.getLogger(__name__)
 
 INTRO_SYSTEM = """You are the entry point of a Blog Writing Agent. This agent
 ONLY writes blogs — it cannot chat casually, answer unrelated questions, or
@@ -35,22 +38,12 @@ async def intro_router(state: State) -> dict:
     try:
         structured_llm = router_llm.with_structured_output(IntroDecision, method="function_calling")
         output = await structured_llm.ainvoke(messages)
+        logger.info(f"[IntroRouter] router_llm output: {output!r}")
     except Exception as e:
-        print(f"[IntroRouter] router_llm failed, falling back: {e}")
-        try:
-            structured_llm = fallback_LLM.with_structured_output(IntroDecision, method="function_calling")
-            output = await structured_llm.ainvoke(messages)
-        except Exception as e2:
-            print(f"[IntroRouter] fallback_LLM also failed: {e2}")
-            output = None
-
-    if output is None:
-        # both LLMs failed — fallback response
-        return {
-            "memory": [AIMessage(content="I'm a Blog Writing Agent. What topic would you like a blog about?")],
-            "topic": "",
-            "decision": "unclear"
-        }
+        logger.exception(f"[IntroRouter] router_llm failed: {e}")
+        structured_llm = fallback_LLM.with_structured_output(IntroDecision, method="function_calling")
+        output = await structured_llm.ainvoke(messages)
+        logger.info(f"[IntroRouter] fallback_LLM output: {output!r}")
 
     return {
         "memory": [AIMessage(content=output.reply)],
